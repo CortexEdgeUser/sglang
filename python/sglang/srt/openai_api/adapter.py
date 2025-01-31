@@ -556,7 +556,7 @@ def v1_generate_request(
         return_logprob=return_logprobs,
         top_logprobs_num=top_logprobs_nums,
         logprob_start_len=logprob_start_lens,
-        return_text_in_logprobs=True,
+        return_text_in_logprobs=False,
         stream=all_requests[0].stream,
         rid=request_ids,
         lora_path=lora_paths,
@@ -1008,7 +1008,7 @@ def v1_chat_generate_request(
         logprob_start_len=logprob_start_lens,
         top_logprobs_num=top_logprobs_nums,
         stream=all_requests[0].stream,
-        return_text_in_logprobs=True,
+        return_text_in_logprobs=False,
         rid=request_ids,
         modalities=modalities_list,
         lora_path=lora_paths,
@@ -1521,22 +1521,27 @@ def to_openai_style_logprobs(
     output_token_logprobs=None,
     input_top_logprobs=None,
     output_top_logprobs=None,
+    return_token_ids=True,  # New parameter added
 ):
     ret_logprobs = LogProbs()
 
     def append_token_logprobs(token_logprobs):
-        for logprob, _, token_text in token_logprobs:
-            ret_logprobs.tokens.append(token_text)
+        for logprob, token_id, token_text in token_logprobs:
+            if return_token_ids:
+                ret_logprobs.tokens.append(f"token_id:{token_id}")  # Including token_id
+            else:
+                ret_logprobs.tokens.append(token_text)  # Text representation
             ret_logprobs.token_logprobs.append(logprob)
-
-            # Not supported yet
             ret_logprobs.text_offset.append(-1)
 
     def append_top_logprobs(top_logprobs):
         for tokens in top_logprobs:
             if tokens is not None:
                 ret_logprobs.top_logprobs.append(
-                    {token[2]: token[0] for token in tokens}
+                    {
+                        (f"token_id:{token_id}" if return_token_ids else token_text): logprob
+                        for logprob, token_id, token_text in tokens  # Include token_id in top logprobs
+                    }
                 )
             else:
                 ret_logprobs.top_logprobs.append(None)
@@ -1550,4 +1555,4 @@ def to_openai_style_logprobs(
     if output_top_logprobs is not None:
         append_top_logprobs(output_top_logprobs)
 
-    return ret_logprobs
+    return ret_logprobs    
